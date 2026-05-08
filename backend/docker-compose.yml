@@ -1,0 +1,34 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      REDIS_URL: "redis://redis:6379"
+      YTDLP_PATH: "/usr/local/bin/yt-dlp"
+      TEMP_DIR: "/tmp"
+      FILE_TTL_MINUTES: "10"
+      RATE_LIMIT_MAX: "20"
+      RATE_LIMIT_WINDOW_MS: "60000"
+      MAX_CONCURRENT_DOWNLOADS: "5"
+      PROGRESS_KEY_TTL_SECONDS: "900"
+      LOG_LEVEL: "info"
+    volumes:
+      - tmp-data:/tmp
+
+volumes:
+  redis-data:
+  tmp-data:

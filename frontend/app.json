@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Fetch.",
+    "slug": "fetch",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "fetch",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080810"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.fetch.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Fetch saves downloaded videos to your photo library so you can keep them.",
+        "NSPhotoLibraryAddUsageDescription": "Fetch saves downloaded videos to your photo library so you can keep them."
+      }
+    },
+    "android": {
+      "package": "ai.fetch.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080810"
+      },
+      "permissions": [
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Fetch needs access to your photo library to save downloaded videos.",
+          "savePhotosPermission": "Fetch needs permission to save downloaded videos to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "https://web-production-5f8e2.up.railway.app"
+    }
+  }
+}
