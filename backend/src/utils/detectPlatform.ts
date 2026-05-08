@@ -9,7 +9,38 @@ const HOST_RULES: Array<{ platform: Platform; pattern: RegExp }> = [
   { platform: 'instagram', pattern: /(^|\.)instagr\.am$/i },
   { platform: 'snapchat', pattern: /(^|\.)snapchat\.com$/i },
   { platform: 'snapchat', pattern: /(^|\.)story\.snapchat\.com$/i },
+  { platform: 'tiktok', pattern: /(^|\.)tiktok\.com$/i },
+  { platform: 'tiktok', pattern: /(^|\.)vm\.tiktok\.com$/i },
+  { platform: 'facebook', pattern: /(^|\.)facebook\.com$/i },
+  { platform: 'facebook', pattern: /(^|\.)fb\.watch$/i },
+  { platform: 'facebook', pattern: /(^|\.)m\.facebook\.com$/i },
+  { platform: 'twitter', pattern: /(^|\.)twitter\.com$/i },
+  { platform: 'twitter', pattern: /(^|\.)x\.com$/i },
+  { platform: 'twitter', pattern: /(^|\.)t\.co$/i },
+  { platform: 'vimeo', pattern: /(^|\.)vimeo\.com$/i },
+  { platform: 'dailymotion', pattern: /(^|\.)dailymotion\.com$/i },
+  { platform: 'dailymotion', pattern: /(^|\.)dai\.ly$/i },
+  { platform: 'reddit', pattern: /(^|\.)reddit\.com$/i },
+  { platform: 'reddit', pattern: /(^|\.)redd\.it$/i },
+  { platform: 'twitch', pattern: /(^|\.)twitch\.tv$/i },
+  { platform: 'twitch', pattern: /(^|\.)clips\.twitch\.tv$/i },
+  { platform: 'soundcloud', pattern: /(^|\.)soundcloud\.com$/i },
 ];
+
+const ALLOWED_PLATFORMS: ReadonlySet<Platform> = new Set<Platform>([
+  'youtube',
+  'instagram',
+  'snapchat',
+  'tiktok',
+  'facebook',
+  'twitter',
+  'vimeo',
+  'dailymotion',
+  'reddit',
+  'twitch',
+  'soundcloud',
+  'generic',
+]);
 
 export function detectPlatform(rawUrl: string): Platform | null {
   if (!rawUrl) return null;
@@ -24,9 +55,9 @@ export function detectPlatform(rawUrl: string): Platform | null {
   for (const rule of HOST_RULES) {
     if (rule.pattern.test(host)) return rule.platform;
   }
-  return null;
+  return 'generic';
 }
 
 export function isPlatformAllowed(platform: string): platform is Platform {
-  return platform === 'youtube' || platform === 'instagram' || platform === 'snapchat';
+  return ALLOWED_PLATFORMS.has(platform as Platform);
 }

@@ -1,4 +1,16 @@
-export type Platform = 'youtube' | 'instagram' | 'snapchat';
+export type Platform =
+  | 'youtube'
+  | 'instagram'
+  | 'snapchat'
+  | 'tiktok'
+  | 'facebook'
+  | 'twitter'
+  | 'vimeo'
+  | 'dailymotion'
+  | 'reddit'
+  | 'twitch'
+  | 'soundcloud'
+  | 'generic';
 
 export interface MediaFormat {
   id: string;
