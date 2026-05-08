@@ -37,10 +37,17 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ info, open, onClose,
   }, [open, stopPoller]);
 
   useEffect(() => {
+    const pollersRef = pollers;
     return () => {
-      Object.keys(pollers.current).forEach(stopPoller);
+      Object.keys(pollersRef.current).forEach((id) => {
+        const handle = pollersRef.current[id];
+        if (handle) {
+          window.clearInterval(handle);
+          delete pollersRef.current[id];
+        }
+      });
     };
-  }, [stopPoller]);
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
