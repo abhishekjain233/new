@@ -1,0 +1,15 @@
+# Nixpacks build plan for Railway / any Nixpacks-compatible host.
+# Installs python3 + ffmpeg + yt-dlp alongside the Node 20 runtime so the
+# backend can spawn yt-dlp directly without a Dockerfile.
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "ffmpeg", "yt-dlp"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node dist/index.js"
