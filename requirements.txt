@@ -1,0 +1,4 @@
+aiogram>=3.28,<4
+pyrogram>=2.0,<3
+TgCrypto>=1.2,<2
+asyncpg>=0.29,<1
