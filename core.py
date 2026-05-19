@@ -610,6 +610,12 @@ _OTP_NEAR_KEYWORD = re.compile(
 _PLAIN_HYPHEN_OTP = re.compile(r"\b\d{2,4}(?:-\d{2,4}){1,3}\b")
 _PLAIN_NUMERIC_OTP = re.compile(r"(?<!\d)\d{4,8}(?!\d)")
 _PHONE_RE = re.compile(r"\+?\d[\d\s\-().]{4,25}\d")
+# Bare digit-run scanner used by Pass 3 of the phone-number stage and
+# by the "longest digit-run = phone, shortest = OTP" fallback.  Real
+# international phone numbers are 8-15 digits (E.164 caps at 15) and
+# real OTPs are 4-8 digits; any longer run is almost certainly a
+# transaction id or a phone+OTP run that was merged by accident.
+_DIGIT_RUN_RE = re.compile(r"(?<!\d)\d{4,15}(?!\d)")
 
 _YEAR_RE = re.compile(r"^(?:19|20)\d{2}$")
 
@@ -670,11 +676,18 @@ def parse_otp(text: str) -> tuple[str | None, str | None, str | None]:
     # Pre-extract phone digits so we can avoid matching OTP candidates
     # that are actually fragments of the phone number (e.g. "123-4567"
     # in "+1 (555) 123-4567").
+    #
+    # We cap each entry at 15 digits (E.164 maximum).  Without this
+    # cap, a single-line message like "+2290144790007 198728 thanks"
+    # gets grabbed by ``_PHONE_RE`` as one 19-digit run, and the OTP
+    # ``198728`` then gets filtered out as a "phone fragment".  Real
+    # phones are never 16+ digits, so anything longer is almost
+    # always a phone+OTP run merged by accident.
     phone_digits_set: set[str] = set()
     for line in text.splitlines():
         for pm in _PHONE_RE.finditer(line):
             pd = re.sub(r"\D", "", pm.group(0))
-            if len(pd) >= 7:
+            if 7 <= len(pd) <= 15:
                 phone_digits_set.add(pd)
 
     def _is_phone_fragment(otp_digits: str) -> bool:
@@ -733,28 +746,44 @@ def parse_otp(text: str) -> tuple[str | None, str | None, str | None]:
     otp_pretty = _format_otp_for_display(raw_otp)
 
     # ── Phone number — accept international and prefixed formats ─
-    # Two-pass strategy:
+    # Three-pass strategy:
     #   pass 1: only consider lines that look like the phone-number
     #           field ("Number: …", "Phone: …", or a bare "+…" line),
     #           and explicitly skip Time/Date/Code/OTP/etc lines.
     #           This stops timestamps like "2026-05-09 18:27:09" from
     #           being captured as a phone number.
-    #   pass 2: fall back to "first phone-shaped match anywhere" so
-    #           messages without explicit labels still work.
+    #           Label/Skip matching tolerates an emoji or punctuation
+    #           prefix (e.g. "☎ Number:", "🏞 Country:") and accepts
+    #           any of ``: - – — =`` as the separator.
+    #   pass 2: stricter '+'-prefixed match anywhere in the message so
+    #           one-liners like 'OTP: 123-456 from +1234567890' still
+    #           work without mistakenly catching timestamps.
+    #   pass 3: last-resort fallback — any 8-15 digit run that isn't
+    #           the OTP and isn't on a Time/Date/etc line.  This
+    #           handles forwards that omit the "+" entirely
+    #           (e.g. ``2290144790007\n198728`` or ``Number:
+    #           251975101413``) per the user's stated rule of thumb:
+    #           "the long number is the phone, the short one is the
+    #           code".
     _LABEL_RE = re.compile(
-        r"^\s*(?:number|phone|mobile|tel|to|recipient)\s*[:\-]",
+        r"^[^\w]*(?:number|phone|mobile|tel|to|recipient)\s*[:\-\u2013\u2014=]",
         re.IGNORECASE,
     )
     _SKIP_RE = re.compile(
-        r"^\s*(?:time|date|service|country|otp|code|pin|verification|"
-        r"confirmation|auth(?:entication)?|login|security|message)\s*[:\-]",
+        r"^[^\w]*(?:time|date|service|country|otp|code|pin|verification|"
+        r"confirmation|auth(?:entication)?|login|security|message|"
+        r"full\s+message|forwarded)\s*[:\-\u2013\u2014=]",
         re.IGNORECASE,
     )
 
     def _accept(candidate_raw: str) -> str | None:
         candidate = re.sub(r"[\s().\-]", "", candidate_raw)
         digits_only = re.sub(r"\D", "", candidate)
-        if len(digits_only) < 7 or digits_only == otp_digits:
+        # Real international phones are 7-15 digits; longer runs are
+        # almost always a phone+OTP that the greedy regex merged.
+        if not (7 <= len(digits_only) <= 15):
+            return None
+        if digits_only == otp_digits:
             return None
         return candidate
 
@@ -775,7 +804,7 @@ def parse_otp(text: str) -> tuple[str | None, str | None, str | None]:
             break
 
     if not number:
-        # Pass 2a: stricter regex requiring an explicit '+' country
+        # Pass 2: stricter regex requiring an explicit '+' country
         # code.  This bypasses the SKIP filter — letting one-liners
         # like 'OTP: 123-456 from +1234567890' still match — without
         # mistakenly catching timestamps such as '2026-05-09 18:27:09'
@@ -787,6 +816,32 @@ def parse_otp(text: str) -> tuple[str | None, str | None, str | None]:
                 if candidate:
                     number = candidate
                     break
+            if number:
+                break
+
+    if not number:
+        # Pass 3: last-resort scan for a bare 8-15 digit run on any
+        # non-skip line — this catches forwards without a '+' or a
+        # "Number:" label, per the user's heuristic that the longer
+        # numeric run is the phone.  We deliberately ignore lines we
+        # already classify as Time/Date/Country/etc so dates and
+        # timestamps never get picked up here.  When a '+' sits
+        # immediately before the digit run we preserve it so the
+        # displayed number keeps its country-code prefix.
+        for line in text.splitlines():
+            if _SKIP_RE.match(line):
+                continue
+            for m in _DIGIT_RUN_RE.finditer(line):
+                cand = m.group(0)
+                if len(cand) < 8 or len(cand) > 15:
+                    continue
+                if cand == otp_digits:
+                    continue
+                start = m.start()
+                if start > 0 and line[start - 1] == "+":
+                    cand = "+" + cand
+                number = cand
+                break
             if number:
                 break
 
